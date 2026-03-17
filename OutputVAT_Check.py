@@ -1,6 +1,4 @@
 import pandas as pd
-import numpy as np
-import os
 import warnings
 import tkinter as tk
 from tkinter import messagebox
@@ -8,9 +6,11 @@ from tkinter import messagebox
 warnings.filterwarnings('ignore', category=UserWarning, module='openpyxl')
 
 
-def process_vat_check(total_file_path, tax_rate_path):
-    root = tk.Tk()
-    root.withdraw()
+def process_vat_check(total_file_path, tax_rate_path, water_simple=None, interactive=True):
+    root = None
+    if interactive:
+        root = tk.Tk()
+        root.withdraw()
 
     print("正在读取数据并检查老项目名单...")
     df_profit = pd.read_excel(total_file_path, sheet_name='利润中心余额表')
@@ -44,11 +44,22 @@ def process_vat_check(total_file_path, tax_rate_path):
         df_old_list = pd.concat([df_old_list, new_items], ignore_index=True)
         with pd.ExcelWriter(total_file_path, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
             df_old_list.to_excel(writer, sheet_name='不动产租赁', index=False)
-        messagebox.showwarning("停机：补充名单", "已补充新的租赁利润中心，请在‘不动产租赁’Sheet标注后重新运行。")
-        return
+        msg = "已补充新的租赁利润中心，请在‘不动产租赁’Sheet标注后重新运行。"
+        if interactive:
+            messagebox.showwarning("停机：补充名单", msg)
+            root.destroy()
+            return
+        raise ValueError(msg)
 
     # --- 2. 水费简易计税确认 ---
-    is_water_simple = messagebox.askyesno("税率确认", "自来水费是否适用简易计税（3%）？")
+    if water_simple is None:
+        if interactive:
+            is_water_simple = messagebox.askyesno("税率确认", "自来水费是否适用简易计税（3%）？")
+        else:
+            is_water_simple = False
+            print("[提示] 非交互模式下未指定 water_simple，默认按‘否’处理。")
+    else:
+        is_water_simple = bool(water_simple)
 
     # --- 3. 核心计算逻辑 ---
     # 以税率表为基准匹配数据
@@ -109,6 +120,9 @@ def process_vat_check(total_file_path, tax_rate_path):
     # --- 5. 写回总表 ---
     with pd.ExcelWriter(total_file_path, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
         df_result.to_excel(writer, sheet_name='销项税额测算', index=False)
+
+    if interactive and root is not None:
+        root.destroy()
 
 
 if __name__ == "__main__":

@@ -12,7 +12,7 @@ def finalize_and_beautify(target_file):
     other_keep_sheets = [
         '科目余额表', '利润中心余额表', '物业收入计提表',
         '收款汇总表', '收入结转汇总表', '中台明细汇总',
-        '中台账套汇总', '不动产租赁'
+        '中台账套汇总', '不动产租赁', '利润中心映射待确认'
     ]
     all_keep = priority_sheets + other_keep_sheets
 

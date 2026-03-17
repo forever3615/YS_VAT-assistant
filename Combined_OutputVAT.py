@@ -1,12 +1,26 @@
 import difflib
 import warnings
+import tkinter as tk
+from tkinter import messagebox
 
 import pandas as pd
 
 warnings.filterwarnings('ignore', category=UserWarning, module='openpyxl')
 
 
-def _build_project_mapping(df_biz, fin_pc_names, cutoff=0.85):
+def ask_confirmation(biz_name, fin_name):
+    """弹出确认窗口，返回是否采用建议映射。"""
+    root = tk.Tk()
+    root.withdraw()
+    result = messagebox.askyesno(
+        "利润中心匹配确认",
+        f"业务项目名：【{biz_name}】\n财务利润中心：【{fin_name}】\n\n相似度较高，是否视为同一个利润中心？"
+    )
+    root.destroy()
+    return result
+
+
+def _build_project_mapping(df_biz, fin_pc_names, cutoff=0.85, interactive=True):
     """构建项目名称到利润中心名称映射，并返回需人工确认清单。"""
     mapping = {}
     pending_rows = []
@@ -18,12 +32,15 @@ def _build_project_mapping(df_biz, fin_pc_names, cutoff=0.85):
 
         matches = difflib.get_close_matches(project_name, fin_pc_names, n=1, cutoff=cutoff)
         if matches:
-            mapping[project_name] = matches[0]
+            suggested = matches[0]
+            score = round(difflib.SequenceMatcher(None, project_name, suggested).ratio(), 4)
+            use_suggestion = ask_confirmation(project_name, suggested) if interactive else True
+            mapping[project_name] = suggested if use_suggestion else project_name
             pending_rows.append({
                 '项目名称': project_name,
-                '建议利润中心名称': matches[0],
-                '相似度': round(difflib.SequenceMatcher(None, project_name, matches[0]).ratio(), 4),
-                '是否采用建议': '待确认'
+                '建议利润中心名称': suggested,
+                '相似度': score,
+                '是否采用建议': '是' if use_suggestion else '否'
             })
         else:
             mapping[project_name] = project_name
@@ -37,7 +54,7 @@ def _build_project_mapping(df_biz, fin_pc_names, cutoff=0.85):
     return mapping, pd.DataFrame(pending_rows)
 
 
-def process_vat_with_mid_platform(target_file, mid_base_file):
+def process_vat_with_mid_platform(target_file, mid_base_file, interactive=True):
     print("\n>>> 开始生成 [销项测算（含中台）] 并进行税金核对 ...")
 
     # 1. 读取基础资料
@@ -57,7 +74,7 @@ def process_vat_with_mid_platform(target_file, mid_base_file):
     df_biz['科目代码'] = df_biz['收费科目'].map(sub_mapping)
     df_biz = df_biz.dropna(subset=['科目代码'])
 
-    pc_name_map, df_mapping_check = _build_project_mapping(df_biz, fin_pc_names)
+    pc_name_map, df_mapping_check = _build_project_mapping(df_biz, fin_pc_names, interactive=interactive)
     df_biz['利润中心名称'] = df_biz['项目名称'].map(pc_name_map)
 
     # 5. 聚合与合并逻辑

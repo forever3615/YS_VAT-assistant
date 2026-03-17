@@ -33,7 +33,7 @@ def main():
         interactive=not args.non_interactive,
     )
     process_revenue_summary(args.target_file, args.collection_file, args.carryover_file, args.provision_file)
-    process_vat_with_mid_platform(args.target_file, args.mid_base_file)
+    process_vat_with_mid_platform(args.target_file, args.mid_base_file, interactive=not args.non_interactive)
     finalize_and_beautify(args.target_file)
 
 
